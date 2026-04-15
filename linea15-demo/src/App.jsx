@@ -2,7 +2,7 @@ import React from "react";
 var useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo;
 var h = React.createElement;
 
-var T = {bg:"#07090F",sf:"#0F1219",sa:"#161B27",bd:"#1E2638",ac:"#6366F1",ah:"#818CF8",as:"rgba(99,102,241,.10)",dn:"#EF4444",ds:"rgba(239,68,68,.10)",wn:"#F59E0B",ws:"rgba(245,158,11,.10)",sc:"#10B981",ss:"rgba(16,185,129,.10)",inf:"#3B82F6",tx:"#E8ECF4",ts:"#8B95A9",td:"#5A6478",wh:"#FFFFFF"};
+var T = {bg:"#F5F0EB",sf:"#FFFFFF",sa:"#F0E8E0",bd:"#E0D5C8",ac:"#E87722",ah:"#F59E0B",as:"rgba(232,119,34,.08)",dn:"#DC2626",ds:"rgba(220,38,38,.08)",wn:"#D97706",ws:"rgba(217,119,6,.08)",sc:"#2E8B57",ss:"rgba(46,139,87,.08)",inf:"#1A7AB5",tx:"#2D2A26",ts:"#6B6560",td:"#9C9590",wh:"#FFFFFF"};
 var CTRL_ST = {pendiente:{l:"Pendiente",c:T.wn,i:"⏳"},en_progreso:{l:"En Progreso",c:T.inf,i:"🔄"},implementado:{l:"Implementado",c:T.ac,i:"✅"},verificado:{l:"Verificado",c:T.sc,i:"🛡️"}};
 var EV_ST = {en_revision:{l:"En revisión",c:T.wn,i:"⏳"},aprobada:{l:"Aprobada",c:T.sc,i:"✓"},rechazada:{l:"Rechazada",c:T.dn,i:"✕"}};
 var EV_TYPES = ["Captura de pantalla","Documento / Política","Log del sistema","Reporte de auditoría","Acta de reunión","Certificación","Resultado de prueba","Correo electrónico","Otro"];
@@ -68,7 +68,7 @@ function bdg(c,b){return{display:"inline-flex",alignItems:"center",gap:4,padding
 
 function NormBox(props){
   var n=props.norm;if(!n)return null;
-  var secs=[{k:"iso27001",l:"ISO 27001",c:"#818CF8",b:"rgba(129,140,248,.10)"},{k:"iso27002",l:"ISO 27002",c:"#60A5FA",b:"rgba(96,165,250,.10)"},{k:"circular",l:"Circular SFC",c:"#FBBF24",b:"rgba(251,191,36,.10)"},{k:"sfc",l:"Req. Nube SFC",c:"#34D399",b:"rgba(52,211,153,.10)"},{k:"otras",l:"Otras Normas",c:"#F87171",b:"rgba(248,113,113,.10)"}];
+  var secs=[{k:"iso27001",l:"ISO 27001",c:"#5B21B6",b:"rgba(91,33,182,.08)"},{k:"iso27002",l:"ISO 27002",c:"#1A7AB5",b:"rgba(26,122,181,.08)"},{k:"circular",l:"Circular SFC",c:"#B45309",b:"rgba(180,83,9,.08)"},{k:"sfc",l:"Req. Nube SFC",c:"#166534",b:"rgba(22,101,52,.08)"},{k:"otras",l:"Otras Normas",c:"#B91C1C",b:"rgba(185,28,28,.08)"}];
   var has=secs.filter(function(s){return n[s.k]&&n[s.k].trim()&&n[s.k].indexOf("Validar aplicación directamente")<0&&n[s.k]!=="Aplica"});
   if(!has.length)return null;
   var _open=useState(false),open=_open[0],setOpen=_open[1];
@@ -304,7 +304,7 @@ function ZoomViewer(props){
     ),
     // Image container
     h("div",{
-      style:{overflow:"hidden",borderRadius:8,background:"#111",cursor:zoom>1?"grab":"zoom-in",position:"relative",maxHeight:500},
+      style:{overflow:"hidden",borderRadius:8,background:"#f5f5f5",cursor:zoom>1?"grab":"zoom-in",position:"relative",maxHeight:500},
       onWheel:onWheel,
       onMouseDown:onDown,
       onMouseMove:onMove,
@@ -434,7 +434,7 @@ function LoginScreen(props) {
     h("div", { style: { width: 420, maxWidth: "90vw" } },
       // Logo
       h("div", { style: { textAlign: "center", marginBottom: 40 } },
-        h("div", { style: { width: 64, height: 64, borderRadius: 16, background: "linear-gradient(135deg," + T.ac + ",#A78BFA)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28, color: T.wh, fontWeight: 900, marginBottom: 16 } }, "L"),
+        h("div", { style: { width: 64, height: 64, borderRadius: 16, background: "linear-gradient(135deg," + T.ac + ",#F59E0B)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28, color: T.wh, fontWeight: 900, marginBottom: 16 } }, "L"),
         h("h1", { style: { margin: 0, fontSize: 32, fontWeight: 900, letterSpacing: "-0.5px" } }, "Línea 1.5"),
         h("p", { style: { margin: "6px 0 0", fontSize: 14, color: T.ts } }, "Gestión de Riesgos Tecnológicos")
       ),
@@ -503,9 +503,21 @@ function MainApp(props){
   var _editEv=useState(null),editEv=_editEv[0],setEditEv=_editEv[1];
   var _ps2=useState(""),projSearch=_ps2[0],setProjSearch=_ps2[1];
   var _pv2=useState("all"),projFilter=_pv2[0],setProjFilter=_pv2[1];
+  var _users=useState(null),users=_users[0],setUsers=_users[1];
+  var _au=useState(""),adminSearch=_au[0],setAdminSearch=_au[1];
+  var _am=useState(null),adminModal=_am[0],setAdminModal=_am[1];
+  var _anu=useState(""),newUser=_anu[0],setNewUser=_anu[1];
+  var _ann=useState(""),newName=_ann[0],setNewName=_ann[1];
+  var _ane=useState(""),newEmail=_ane[0],setNewEmail=_ane[1];
+  var _anr=useState("lider"),newRole=_anr[0],setNewRole=_anr[1];
+  var _anp=useState(""),newPw=_anp[0],setNewPw=_anp[1];
+  var _aeu=useState(null),editingUser=_aeu[0],setEditingUser=_aeu[1];
+  var _apm=useState(null),permUser=_apm[0],setPermUser=_apm[1];
 
   useEffect(function(){(function(){var d=loadD();setProjects(d&&d.length>0?d:[makeDemo()]);setReady(true)})()},[]);
   useEffect(function(){if(ready&&projects)saveD(projects)},[projects,ready]);
+  useEffect(function(){var u=loadUsers();setUsers(u&&u.length>0?u:DEFAULT_USERS)},[]);
+  useEffect(function(){if(users)saveUsers(users)},[users]);
 
   var proj=useMemo(function(){return projects?projects.find(function(p){return p.id===pid})||null:null},[projects,pid]);
   function up(fn){setProjects(function(ps){return ps.map(function(p){return p.id===pid?fn(p):p})})}
@@ -536,13 +548,16 @@ function MainApp(props){
       // User bar
       h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,padding:"10px 16px",background:T.sf,borderRadius:10,border:"1px solid "+T.bd}},
         h("div",{style:{display:"flex",alignItems:"center",gap:10}},
-          h("div",{style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,"+T.ac+",#A78BFA)",display:"flex",alignItems:"center",justifyContent:"center",color:T.wh,fontWeight:800,fontSize:14}},session.name?session.name.charAt(0).toUpperCase():"U"),
+          h("div",{style:{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,"+T.ac+",#F59E0B)",display:"flex",alignItems:"center",justifyContent:"center",color:T.wh,fontWeight:800,fontSize:14}},session.name?session.name.charAt(0).toUpperCase():"U"),
           h("div",null,
             h("div",{style:{fontSize:13,fontWeight:700,color:T.tx}},session.name||session.username),
             h("div",{style:{fontSize:11,color:T.td}},(AUTH_ROLES[session.role]||{}).l||session.role)
           )
         ),
-        h("button",{style:btnS("ghost","sm"),onClick:onLogout},"Cerrar sesión →")
+        h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+          session.role==="admin"?h("button",{style:btnS("outline","sm"),onClick:function(){setView("admin")}},"⚙️ Usuarios"):null,
+          h("button",{style:btnS("ghost","sm"),onClick:onLogout},"Cerrar sesión →")
+        )
       ),
       // Header
       h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}},
@@ -738,13 +753,13 @@ function MainApp(props){
             h("span",{style:Object.assign({},mS,{fontSize:16,fontWeight:800,color:pctFull>=100?T.sc:T.ac})},pctFull+"%")
           ),
           h("div",{style:{height:14,background:T.sa,borderRadius:7,overflow:"hidden"}},
-            h("div",{style:{height:"100%",width:pctFull+"%",background:pctFull>=100?"linear-gradient(90deg,#10B981,#34D399)":"linear-gradient(90deg,"+T.ac+",#A78BFA)",borderRadius:7,transition:"width .4s"}})
+            h("div",{style:{height:"100%",width:pctFull+"%",background:pctFull>=100?"linear-gradient(90deg,#10B981,#34D399)":"linear-gradient(90deg,"+T.ac+",#F59E0B)",borderRadius:7,transition:"width .4s"}})
           ),
           h("div",{style:{fontSize:11,color:T.td,marginTop:4}},ctrlFull+" de "+tc+" controles tienen cumplimiento documentado y evidencia aprobada")
         ),
 
         // ── AVANCE TOTAL DE LA MATRIZ ──
-        h("div",{style:{marginTop:24,padding:"20px 24px",background:"linear-gradient(135deg,"+T.ac+"15,#A78BFA15)",borderRadius:14,border:"1px solid "+T.ac+"33"}},
+        h("div",{style:{marginTop:24,padding:"20px 24px",background:"linear-gradient(135deg,"+T.ac+"15,#F59E0B15)",borderRadius:14,border:"1px solid "+T.ac+"33"}},
           h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},
             h("div",{style:{display:"flex",alignItems:"center",gap:10}},
               h("span",{style:{fontSize:24}},"📊"),
@@ -753,7 +768,7 @@ function MainApp(props){
             h("span",{style:Object.assign({},mS,{fontSize:28,fontWeight:800,color:(function(){var avg=Math.round((pctCtrl+pctCoverage+pctFull)/3);return avg>=80?T.sc:avg>=50?T.wn:T.ac})()})},Math.round((pctCtrl+pctCoverage+pctFull)/3)+"%")
           ),
           h("div",{style:{height:20,background:T.sa,borderRadius:10,overflow:"hidden",marginBottom:12}},
-            h("div",{style:{height:"100%",width:Math.round((pctCtrl+pctCoverage+pctFull)/3)+"%",background:(function(){var avg=Math.round((pctCtrl+pctCoverage+pctFull)/3);return avg>=80?"linear-gradient(90deg,#10B981,#34D399)":avg>=50?"linear-gradient(90deg,"+T.wn+",#FBBF24)":"linear-gradient(90deg,"+T.ac+",#A78BFA)"})(),borderRadius:10,transition:"width .5s ease"}})
+            h("div",{style:{height:"100%",width:Math.round((pctCtrl+pctCoverage+pctFull)/3)+"%",background:(function(){var avg=Math.round((pctCtrl+pctCoverage+pctFull)/3);return avg>=80?"linear-gradient(90deg,#10B981,#34D399)":avg>=50?"linear-gradient(90deg,"+T.wn+",#FBBF24)":"linear-gradient(90deg,"+T.ac+",#F59E0B)"})(),borderRadius:10,transition:"width .5s ease"}})
           ),
           h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}},
             [{l:"Controles",v:pctCtrl,c:pctCtrl>=100?T.sc:T.wn,i:"📝"},{l:"Cobertura Ev.",v:pctCoverage,c:pctCoverage>=100?T.sc:T.inf,i:"📎"},{l:"Completitud",v:pctFull,c:pctFull>=100?T.sc:T.ac,i:"🏆"}].map(function(item){
@@ -915,11 +930,178 @@ function MainApp(props){
     );
   }
 
+  // ═══ ADMIN - USER MANAGEMENT ═══
+  if(view==="admin"&&session.role==="admin"){
+
+    var filteredUsers=(users||[]).filter(function(u){return !adminSearch||(u.username+" "+u.name+" "+u.email+" "+u.role).toLowerCase().indexOf(adminSearch.toLowerCase())>=0});
+
+    function createUser(){
+      if(!newUser||!newName||!newPw)return;
+      if(users.some(function(u){return u.username===newUser})){alert("El usuario ya existe");return}
+      var nu={id:uid(),username:newUser,name:newName,email:newEmail,role:newRole,password:newPw,active:true,createdAt:today(),projectPerms:{}};
+      setUsers(function(prev){return prev.concat([nu])});
+      setNewUser("");setNewName("");setNewEmail("");setNewRole("lider");setNewPw("");setAdminModal(null);
+    }
+    function toggleUser(id){setUsers(function(prev){return prev.map(function(u){return u.id===id?Object.assign({},u,{active:!u.active}):u})})}
+    function deleteUser(id){if(!confirm("¿Eliminar este usuario?"))return;setUsers(function(prev){return prev.filter(function(u){return u.id!==id})})}
+    function updateUserField(id,field,value){setUsers(function(prev){return prev.map(function(u){return u.id===id?Object.assign({},u,Object.fromEntries([[field,value]])):u})})}
+    function setProjectPerm(userId,projectId,perm){
+      setUsers(function(prev){return prev.map(function(u){
+        if(u.id!==userId)return u;
+        var perms=Object.assign({},u.projectPerms||{});
+        if(perm==="none"){delete perms[projectId]}else{perms[projectId]=perm}
+        return Object.assign({},u,{projectPerms:perms});
+      })});
+    }
+
+    content=h("div",null,
+      h("button",{style:btnS("ghost","sm"),onClick:function(){setView("projects")}},"← Proyectos"),
+      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"12px 0 20px"}},
+        h("div",null,
+          h("h2",{style:{margin:0,fontSize:24,fontWeight:900}},"⚙️ Administración de Usuarios"),
+          h("p",{style:{margin:"4px 0 0",fontSize:13,color:T.ts}},"Crear, editar y asignar permisos por proyecto")
+        ),
+        h("button",{style:btnS("primary"),onClick:function(){setAdminModal("create")}},"＋ Nuevo Usuario")
+      ),
+
+      // Stats
+      h("div",{style:{display:"flex",gap:12,marginBottom:16}},
+        [{l:"Total",v:(users||[]).length,c:T.ac},{l:"Activos",v:(users||[]).filter(function(u){return u.active}).length,c:T.sc},{l:"Inactivos",v:(users||[]).filter(function(u){return!u.active}).length,c:T.dn}].map(function(s){
+          return h("div",{key:s.l,style:{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",background:T.sa,borderRadius:8,border:"1px solid "+T.bd}},
+            h("span",{style:Object.assign({},mS,{fontSize:16,fontWeight:800,color:s.c})},s.v),
+            h("span",{style:{fontSize:11,color:T.td}},s.l)
+          );
+        })
+      ),
+
+      // Search
+      h("input",{style:Object.assign({},iS,{marginBottom:16}),placeholder:"🔍 Buscar usuario...",value:adminSearch,onChange:function(e){setAdminSearch(e.target.value)}}),
+
+      // Users table
+      h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+        // Header
+        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 120px 100px 120px",gap:10,padding:"8px 16px",fontSize:10,fontWeight:700,color:T.td,textTransform:"uppercase"}},
+          h("span",null,"Usuario"),
+          h("span",null,"Correo"),
+          h("span",null,"Rol"),
+          h("span",{style:{textAlign:"center"}},"Estado"),
+          h("span",{style:{textAlign:"center"}},"Acciones")
+        ),
+        // Rows
+        filteredUsers.map(function(u){
+          var roleInfo=AUTH_ROLES[u.role]||{l:u.role};
+          var projCount=u.projectPerms?Object.keys(u.projectPerms).length:0;
+          return h("div",{key:u.id,style:{background:T.sf,borderRadius:10,border:"1px solid "+T.bd,padding:"12px 16px",opacity:u.active?1:.5}},
+            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 120px 100px 120px",gap:10,alignItems:"center"}},
+              // User info
+              h("div",{style:{display:"flex",alignItems:"center",gap:10}},
+                h("div",{style:{width:32,height:32,borderRadius:"50%",background:u.active?"linear-gradient(135deg,"+T.ac+",#F59E0B)":T.sa,display:"flex",alignItems:"center",justifyContent:"center",color:T.wh,fontWeight:800,fontSize:12}},u.name?u.name.charAt(0).toUpperCase():"U"),
+                h("div",null,
+                  h("div",{style:{fontSize:13,fontWeight:700}},u.name),
+                  h("div",{style:{fontSize:10,color:T.td}},"@"+u.username)
+                )
+              ),
+              // Email
+              h("div",{style:{fontSize:12,color:T.ts}},u.email||"—"),
+              // Role
+              h("div",null,h("span",{style:bdg(T.ac,T.as)},roleInfo.l)),
+              // Status
+              h("div",{style:{textAlign:"center"}},
+                h("button",{style:Object.assign({},btnS(u.active?"success":"danger","sm"),{width:"100%",justifyContent:"center"}),onClick:function(){toggleUser(u.id)}},u.active?"✓ Activo":"✕ Inactivo")
+              ),
+              // Actions
+              h("div",{style:{display:"flex",gap:4,justifyContent:"center"}},
+                h("button",{style:btnS("outline","sm"),onClick:function(){setPermUser(u);setAdminModal("perms")}},"🔑"),
+                h("button",{style:btnS("outline","sm"),onClick:function(){setEditingUser(u);setAdminModal("edit")}},"✏️"),
+                u.id!=="admin"?h("button",{style:btnS("danger","sm"),onClick:function(){deleteUser(u.id)}},"🗑"):null
+              )
+            ),
+            // Project permissions summary
+            projCount>0?h("div",{style:{marginTop:8,paddingTop:8,borderTop:"1px solid "+T.bd,display:"flex",gap:6,flexWrap:"wrap"}},
+              h("span",{style:{fontSize:10,color:T.td}},"Proyectos asignados:"),
+              Object.entries(u.projectPerms||{}).map(function(entry){
+                var projName=projects?projects.find(function(p){return p.id===entry[0]}):null;
+                var permLabel={full:"Completo",fill:"Solo llenar",evidence:"Solo evidencias",view:"Solo ver"}[entry[1]]||entry[1];
+                return h("span",{key:entry[0],style:bdg(T.inf,T.inf+"18")},(projName?projName.name.substring(0,15):entry[0])+" → "+permLabel);
+              })
+            ):null
+          );
+        })
+      ),
+
+      // Create user modal
+      adminModal==="create"?h(Mdl,{title:"Crear Nuevo Usuario",onClose:function(){setAdminModal(null)}},
+        h(Fld,{label:"Nombre de usuario"},h("input",{style:iS,value:newUser,onChange:function(e){setNewUser(e.target.value)},placeholder:"Ej: jperez"})),
+        h(Fld,{label:"Nombre completo"},h("input",{style:iS,value:newName,onChange:function(e){setNewName(e.target.value)},placeholder:"Ej: Juan Pérez"})),
+        h(Fld,{label:"Correo electrónico"},h("input",{style:iS,value:newEmail,onChange:function(e){setNewEmail(e.target.value)},placeholder:"Ej: jperez@empresa.com"})),
+        h(Fld,{label:"Rol"},h("select",{style:Object.assign({},sS,{width:"100%"}),value:newRole,onChange:function(e){setNewRole(e.target.value)}},
+          Object.entries(AUTH_ROLES).map(function(entry){return h("option",{key:entry[0],value:entry[0]},entry[1].l)})
+        )),
+        h(Fld,{label:"Contraseña"},h("input",{type:"password",style:iS,value:newPw,onChange:function(e){setNewPw(e.target.value)},placeholder:"Mínimo 6 caracteres"})),
+        h("div",{style:{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}},
+          h("button",{style:btnS("outline"),onClick:function(){setAdminModal(null)}},"Cancelar"),
+          h("button",{style:btnS("primary"),disabled:!newUser||!newName||!newPw,onClick:createUser},"Crear Usuario")
+        )
+      ):null,
+
+      // Edit user modal
+      adminModal==="edit"&&editingUser?h(Mdl,{title:"Editar Usuario: "+editingUser.name,onClose:function(){setAdminModal(null);setEditingUser(null)}},
+        h(Fld,{label:"Nombre completo"},h("input",{style:iS,value:editingUser.name,onChange:function(e){var v=e.target.value;setEditingUser(function(prev){return Object.assign({},prev,{name:v})})}})),
+        h(Fld,{label:"Correo electrónico"},h("input",{style:iS,value:editingUser.email||"",onChange:function(e){var v=e.target.value;setEditingUser(function(prev){return Object.assign({},prev,{email:v})})}})),
+        h(Fld,{label:"Rol"},h("select",{style:Object.assign({},sS,{width:"100%"}),value:editingUser.role,onChange:function(e){var v=e.target.value;setEditingUser(function(prev){return Object.assign({},prev,{role:v})})}},
+          Object.entries(AUTH_ROLES).map(function(entry){return h("option",{key:entry[0],value:entry[0]},entry[1].l)})
+        )),
+        h(Fld,{label:"Nueva contraseña (dejar vacío para no cambiar)"},h("input",{type:"password",style:iS,placeholder:"••••••••",onChange:function(e){var v=e.target.value;if(v)setEditingUser(function(prev){return Object.assign({},prev,{password:v})})}})),
+        h("div",{style:{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}},
+          h("button",{style:btnS("outline"),onClick:function(){setAdminModal(null);setEditingUser(null)}},"Cancelar"),
+          h("button",{style:btnS("primary"),onClick:function(){
+            setUsers(function(prev){return prev.map(function(u){return u.id===editingUser.id?editingUser:u})});
+            setAdminModal(null);setEditingUser(null);
+          }},"💾 Guardar Cambios")
+        )
+      ):null,
+
+      // Project permissions modal
+      adminModal==="perms"&&permUser?h(Mdl,{title:"Permisos de: "+permUser.name,onClose:function(){setAdminModal(null);setPermUser(null)}},
+        h("div",{style:{marginBottom:16}},
+          h("div",{style:{fontSize:13,color:T.ts,marginBottom:4}},"Asigna el nivel de acceso para cada proyecto:"),
+          h("div",{style:{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}},
+            h("span",{style:bdg(T.sc,T.ss)},"Completo = todo"),
+            h("span",{style:bdg(T.wn,T.ws)},"Llenar = solo controles"),
+            h("span",{style:bdg(T.inf,T.inf+"18")},"Evidencias = solo evidencias"),
+            h("span",{style:bdg(T.td,T.sa)},"Ver = solo lectura")
+          )
+        ),
+        h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+          (projects||[]).map(function(p){
+            var currentPerm=(permUser.projectPerms||{})[p.id]||"none";
+            return h("div",{key:p.id,style:{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:T.sa,borderRadius:8,border:"1px solid "+T.bd}},
+              h("div",{style:{flex:1,minWidth:0}},
+                h("div",{style:{fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},p.name),
+                h("div",{style:{fontSize:10,color:T.td}},p.responsible)
+              ),
+              h("select",{style:Object.assign({},sS,{width:160}),value:currentPerm,onChange:function(e){setProjectPerm(permUser.id,p.id,e.target.value);setPermUser(function(prev){var perms=Object.assign({},prev.projectPerms||{});if(e.target.value==="none"){delete perms[p.id]}else{perms[p.id]=e.target.value}return Object.assign({},prev,{projectPerms:perms})})}},
+                h("option",{value:"none"},"❌ Sin acceso"),
+                h("option",{value:"full"},"✅ Completo"),
+                h("option",{value:"fill"},"📝 Solo llenar controles"),
+                h("option",{value:"evidence"},"📎 Solo evidencias"),
+                h("option",{value:"view"},"👁 Solo ver")
+              )
+            );
+          })
+        ),
+        h("div",{style:{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}},
+          h("button",{style:btnS("primary"),onClick:function(){setAdminModal(null);setPermUser(null)}},"✓ Listo")
+        )
+      ):null
+    );
+  }
+
   var projModal=null;
   if(modal==="add-project"){
     projModal=h(Mdl,{title:"Nuevo Proyecto",onClose:function(){setModal(null)}},
       h(Fld,{label:"Nombre del proyecto"},h("input",{style:iS,value:pn,onChange:function(e){sPn(e.target.value)},placeholder:"Ej: Migración Cloud"})),
-      h(Fld,{label:"Fecha de publicación"},h("input",{type:"date",style:Object.assign({},iS,{colorScheme:"dark"}),value:pdt||today(),onChange:function(e){sPd(e.target.value)},onClick:function(e){try{e.target.showPicker()}catch(err){}}})),
+      h(Fld,{label:"Fecha de publicación"},h("input",{type:"date",style:Object.assign({},iS,{colorScheme:"light"}),value:pdt||today(),onChange:function(e){sPd(e.target.value)},onClick:function(e){try{e.target.showPicker()}catch(err){}}})),
       h(Fld,{label:"Responsable"},h("input",{style:iS,value:prsp,onChange:function(e){sPr(e.target.value)},placeholder:"Ej: Líder Técnico del Proyecto"})),
       h("div",{style:{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}},h("button",{style:btnS("outline"),onClick:function(){setModal(null)}},"Cancelar"),h("button",{style:btnS("primary"),disabled:!pn||!prsp,onClick:addProject},"Crear Proyecto"))
     );
