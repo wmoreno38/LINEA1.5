@@ -102,35 +102,38 @@ function Questionnaire(props){
   useEffect(function(){setLv(items[Math.min(idx,total-1)].compliance||"")},[idx]);
   function saveGo(ni){onSave(cur.id,lv);setIdx(ni)}
 
-  return h("div",{style:{maxWidth:800,margin:"0 auto",padding:"0 0 40px"}},
+  return h("div",{style:{maxWidth:900,margin:"0 auto",padding:"0 0 30px"}},
     h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}},
-      h("button",{style:btnS("ghost","sm"),onClick:function(){onSave(cur.id,lv);onFinish()}},"← Volver al Dashboard"),
-      h("span",{style:Object.assign({},mS,{fontSize:13,color:T.sc,fontWeight:700})},filled+"/"+total+" completados")
+      h("button",{style:btnS("ghost","sm"),onClick:function(){onSave(cur.id,lv);onFinish()}},"← Dashboard"),
+      h("span",{style:Object.assign({},mS,{fontSize:12,color:T.sc,fontWeight:700})},filled+"/"+total+" completados")
     ),
-    h("div",{style:{height:10,background:T.sa,borderRadius:5,overflow:"hidden",marginBottom:24}},h("div",{style:{height:"100%",width:(filled/total*100)+"%",background:"linear-gradient(90deg,"+T.ac+","+T.sc+")",borderRadius:5,transition:"width .4s"}})),
-    h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginBottom:24,justifyContent:"center"}},items.map(function(item,i){
+    h("div",{style:{height:6,background:T.sa,borderRadius:3,overflow:"hidden",marginBottom:14}},h("div",{style:{height:"100%",width:(filled/total*100)+"%",background:"linear-gradient(90deg,"+T.ac+","+T.sc+")",borderRadius:3,transition:"width .4s"}})),
+    h("div",{style:{display:"flex",gap:3,flexWrap:"wrap",marginBottom:14,justifyContent:"center"}},items.map(function(item,i){
       var done=item.compliance&&item.compliance.trim();var active=i===safeIdx;
-      return h("button",{key:i,onClick:function(){onSave(cur.id,lv);setIdx(i)},style:{width:30,height:30,borderRadius:"50%",border:active?"2px solid "+T.ah:"2px solid transparent",background:active?T.ac:done?T.sc:T.sa,color:active||done?T.wh:T.td,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center"}},i+1)
+      return h("button",{key:i,onClick:function(){onSave(cur.id,lv);setIdx(i)},style:{width:26,height:26,borderRadius:"50%",border:active?"2px solid "+T.ah:"2px solid transparent",background:active?T.ac:done?T.sc:T.sa,color:active||done?T.wh:T.td,fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"'Space Mono',monospace",display:"flex",alignItems:"center",justifyContent:"center"}},i+1)
     })),
-    h("div",{style:{background:T.sf,borderRadius:16,border:"2px solid "+T.ac+"55",overflow:"hidden"}},
-      h("div",{style:{background:T.ac,padding:"16px 24px"}},
-        h("div",{style:{fontSize:11,color:"rgba(255,255,255,.7)",fontWeight:600}},"PREGUNTA "+(safeIdx+1)+" DE "+total+" — "+cur.code),
-        h("div",{style:{fontSize:16,fontWeight:800,color:T.wh,marginTop:4}},cur.causaBase)
+    h("div",{style:{background:T.sf,borderRadius:12,border:"1px solid "+T.ac+"44",overflow:"hidden"}},
+      h("div",{style:{background:T.ac,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
+        h("div",null,
+          h("span",{style:{fontSize:10,color:"rgba(255,255,255,.6)",fontWeight:600}},"PREGUNTA "+(safeIdx+1)+" DE "+total+" — "),
+          h("span",{style:{fontSize:10,color:"rgba(255,255,255,.6)"}},cur.code)
+        ),
+        h("span",{style:{fontSize:14,fontWeight:800,color:T.wh}},cur.causaBase)
       ),
-      h("div",{style:{padding:"20px 24px",borderBottom:"1px solid "+T.bd}},
-        h("div",{style:{fontSize:11,fontWeight:700,color:T.td,textTransform:"uppercase",marginBottom:8}},"Causas asociadas:"),
-        h("div",{style:{fontSize:13,color:T.ts,lineHeight:1.6,padding:"12px 16px",background:T.sa,borderRadius:8}},cur.causasAsociadas)
+      h("div",{style:{padding:"12px 18px",borderBottom:"1px solid "+T.bd}},
+        h("div",{style:{fontSize:10,fontWeight:700,color:T.td,textTransform:"uppercase",marginBottom:4}},"Causas asociadas:"),
+        h("div",{style:{fontSize:12,color:T.ts,lineHeight:1.5,padding:"8px 12px",background:T.sa,borderRadius:6}},cur.causasAsociadas)
       ),
-      h("div",{style:{padding:"16px 24px",borderBottom:"1px solid "+T.bd}},
-        h("div",{style:{fontSize:11,fontWeight:700,color:T.ac,textTransform:"uppercase",marginBottom:10}},"Control a validar:"),
-        h("div",{style:{fontSize:14,color:T.tx,lineHeight:1.8,padding:"16px 20px",background:T.as,borderRadius:10,border:"1px solid "+T.ac+"33",whiteSpace:"pre-line"}},cur.controlBase)
+      h("div",{style:{padding:"12px 18px",borderBottom:"1px solid "+T.bd}},
+        h("div",{style:{fontSize:10,fontWeight:700,color:T.ac,textTransform:"uppercase",marginBottom:6}},"Control a validar:"),
+        h("div",{style:{fontSize:13,color:T.tx,lineHeight:1.7,padding:"10px 14px",background:T.as,borderRadius:8,border:"1px solid "+T.ac+"33",whiteSpace:"pre-line"}},cur.controlBase)
       ),
-      h("div",{style:{padding:"0 24px 16px"}},h(NormBox,{norm:cur.normatividad})),
-      h("div",{style:{padding:"0 24px 24px"}},
-        h("div",{style:{background:T.bg,borderRadius:12,padding:"18px 20px",border:"2px dashed "+T.wn+"66"}},
-          h("label",{style:{fontSize:14,fontWeight:800,color:T.wn,display:"block",marginBottom:10}},"✏️  ¿Cómo se cumple este control en tu proyecto?"),
-          h("textarea",{key:"ta-"+cur.id,style:Object.assign({},iS,{minHeight:150,resize:"vertical",lineHeight:"1.7"}),value:lv,onChange:function(e){setLv(e.target.value)},placeholder:"Escribe aquí tu respuesta describiendo cómo se cumple este control..."}),
-          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}},
+      h("div",{style:{padding:"6px 18px 10px"}},h(NormBox,{norm:cur.normatividad})),
+      h("div",{style:{padding:"0 18px 16px"}},
+        h("div",{style:{background:T.bg,borderRadius:10,padding:"14px 16px",border:"2px dashed "+T.wn+"55"}},
+          h("label",{style:{fontSize:13,fontWeight:800,color:T.wn,display:"block",marginBottom:8}},"✏️  ¿Cómo se cumple este control en tu proyecto?"),
+          h("textarea",{key:"ta-"+cur.id,style:Object.assign({},iS,{minHeight:120,resize:"vertical",lineHeight:"1.6",fontSize:13}),value:lv,onChange:function(e){setLv(e.target.value)},placeholder:"Escribe aquí tu respuesta describiendo cómo se cumple este control..."}),
+          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}},
             lv.trim()?h("span",{style:bdg(T.sc,T.ss)},"✓ Respondido"):h("span",{style:bdg(T.wn,T.ws)},"⏳ Sin responder"),
             h("div",{style:{display:"flex",gap:6}},
               lv.trim()?h("button",{style:btnS("danger","sm"),onClick:function(){setLv("");onSave(cur.id,"")}},"🗑 Limpiar"):null,
@@ -140,13 +143,13 @@ function Questionnaire(props){
         )
       )
     ),
-    h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:24}},
-      h("button",{style:btnS(safeIdx>0?"outline":"ghost"),disabled:safeIdx===0,onClick:function(){saveGo(safeIdx-1)}},"← Anterior"),
-      h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-        h("span",{style:Object.assign({},mS,{fontSize:13,color:T.td})},(safeIdx+1)+"/"+total),
-        h("button",{style:Object.assign({},btnS("outline","sm"),{marginLeft:8}),onClick:function(){onSave(cur.id,lv);onFinish()}},"💾 Guardar y salir")
+    h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:16}},
+      h("button",{style:btnS(safeIdx>0?"outline":"ghost","sm"),disabled:safeIdx===0,onClick:function(){saveGo(safeIdx-1)}},"← Anterior"),
+      h("div",{style:{display:"flex",gap:6,alignItems:"center"}},
+        h("span",{style:Object.assign({},mS,{fontSize:12,color:T.td})},(safeIdx+1)+"/"+total),
+        h("button",{style:Object.assign({},btnS("outline","sm"),{marginLeft:6}),onClick:function(){onSave(cur.id,lv);onFinish()}},"💾 Guardar y salir")
       ),
-      safeIdx<total-1?h("button",{style:btnS("primary"),onClick:function(){saveGo(safeIdx+1)}},"Siguiente →"):h("button",{style:btnS("success","lg"),onClick:function(){onSave(cur.id,lv);onFinish()}},"✓ Finalizar")
+      safeIdx<total-1?h("button",{style:btnS("primary","sm"),onClick:function(){saveGo(safeIdx+1)}},"Siguiente →"):h("button",{style:btnS("success"),onClick:function(){onSave(cur.id,lv);onFinish()}},"✓ Finalizar")
     ),
     filled===total?h("div",{style:{marginTop:30,textAlign:"center",padding:20,background:T.ss,borderRadius:12}},h("div",{style:{fontSize:32}},"🎉"),h("div",{style:{fontSize:16,fontWeight:800,color:T.sc}},"¡Todos los controles respondidos!")):null
   );
@@ -383,7 +386,7 @@ var AUTH_ROLES = {
 function loadUsers(){try{var v=localStorage.getItem("l15-users");return v?JSON.parse(v):null}catch(e){return null}}
 function saveUsers(d){try{localStorage.setItem("l15-users",JSON.stringify(d))}catch(e){}}
 function loadSession(){try{var v=localStorage.getItem("l15-session");return v?JSON.parse(v):null}catch(e){return null}}
-function saveSession(d){try{localStorage.setItem("l15-session",d?JSON.stringify(d):null);if(!d)localStorage.removeItem("l15-session")}catch(e){}}
+function saveSession(d){try{if(d){localStorage.setItem("l15-session",JSON.stringify(d))}else{localStorage.removeItem("l15-session")}}catch(e){}}
 
 var DEFAULT_USERS = [
   { id: "admin", username: "admin", name: "Administrador", email: "admin@empresa.com", role: "admin", password: "admin123", active: true, createdAt: "2026-01-01" },
@@ -410,7 +413,7 @@ function LoginScreen(props) {
   function doLogin() {
     if (!user || !pw) { setErr("Ingresa usuario y contraseña"); return; }
     setLoading(true); setErr("");
-    // [AD-INTEGRATION] Replace this block with: fetch('/api/auth/ldap', {...}).then(...)
+    // [AD-INTEGRATION] Replace with: fetch('/api/auth/ldap', {...})
     var users = loadUsers();
     var allUsers = users && users.length > 0 ? users : DEFAULT_USERS;
     var found = authenticateLocal(allUsers, user, pw);
@@ -916,7 +919,7 @@ function MainApp(props){
   if(modal==="add-project"){
     projModal=h(Mdl,{title:"Nuevo Proyecto",onClose:function(){setModal(null)}},
       h(Fld,{label:"Nombre del proyecto"},h("input",{style:iS,value:pn,onChange:function(e){sPn(e.target.value)},placeholder:"Ej: Migración Cloud"})),
-      h(Fld,{label:"Fecha de publicación"},h("input",{type:"date",style:iS,value:pdt,onChange:function(e){sPd(e.target.value)}})),
+      h(Fld,{label:"Fecha de publicación"},h("input",{type:"date",style:Object.assign({},iS,{colorScheme:"dark"}),value:pdt||today(),onChange:function(e){sPd(e.target.value)},onClick:function(e){try{e.target.showPicker()}catch(err){}}})),
       h(Fld,{label:"Responsable"},h("input",{style:iS,value:prsp,onChange:function(e){sPr(e.target.value)},placeholder:"Ej: Líder Técnico del Proyecto"})),
       h("div",{style:{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}},h("button",{style:btnS("outline"),onClick:function(){setModal(null)}},"Cancelar"),h("button",{style:btnS("primary"),disabled:!pn||!prsp,onClick:addProject},"Crear Proyecto"))
     );
@@ -929,7 +932,7 @@ function MainApp(props){
 
   return h("div",{style:{fontFamily:"'DM Sans',sans-serif",background:T.bg,color:T.tx,minHeight:"100vh"}},
     h("link",{href:"https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap",rel:"stylesheet"}),
-    h("main",{style:{maxWidth:900,margin:"0 auto",padding:"24px 20px"}},content),
+    h("main",{style:{maxWidth:1100,margin:"0 auto",padding:"20px 24px"}},content),
     projModal,
     editEvModal
   );
