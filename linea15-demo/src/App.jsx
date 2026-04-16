@@ -96,7 +96,10 @@ const LOG_TYPES={
   USER_TOGGLE:{cat:"Usuarios",icon:"🔒",color:"#D97706"},
   USER_DELETE:{cat:"Usuarios",icon:"🗑",color:"#DC2626"},
   USER_EDIT:{cat:"Usuarios",icon:"✏️",color:"#D97706"},
-  USER_PERMS:{cat:"Usuarios",icon:"🔑",color:"#E87722"}
+  USER_PERMS:{cat:"Usuarios",icon:"🔑",color:"#E87722"},
+  PROJECT_FINALIZE:{cat:"Proyecto",icon:"🏁",color:"#2E8B57"},
+  ARCHIVE_VIEW:{cat:"Archivo",icon:"📚",color:"#1A7AB5"},
+  ARCHIVE_EXPORT:{cat:"Archivo",icon:"📥",color:"#1A7AB5"}
 };
 
 function loadLogs(){
@@ -113,6 +116,24 @@ function saveLogs(d){
     localStorage.setItem("l15-logs",JSON.stringify(d));
   }catch(e){
     console.warn("saveLogs: unable to persist logs to localStorage",e?.message);
+  }
+}
+
+// ═══ ARCHIVE STORAGE: Matrices finalizadas ═══
+function loadArchive(){
+  try{
+    const v=localStorage.getItem("l15-archive");
+    return v?JSON.parse(v):[];
+  }catch(e){
+    console.warn("loadArchive: unable to load archive",e?.message);
+    return [];
+  }
+}
+function saveArchive(d){
+  try{
+    localStorage.setItem("l15-archive",JSON.stringify(d));
+  }catch(e){
+    console.warn("saveArchive: unable to persist archive",e?.message);
   }
 }
 
@@ -527,10 +548,47 @@ function saveSession(d){
   }
 }
 
+// ═══ SECURITY: Password Hashing (SHA-256 + salt) ═══
+// OWASP A02 mitigation: Never store passwords in plain text
+async function hashPassword(password, salt) {
+  const effectiveSalt = salt || "linea15-salt-v1";
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + effectiveSalt);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Synchronous fallback for demo (uses simple hash)
+function hashPasswordSync(password) {
+  // Simple deterministic hash for demo - production should use bcrypt on backend
+  const salt = "linea15-salt-v1";
+  const str = password + salt;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  // Convert to hex + additional mixing
+  const secondary = btoa(str).split("").reverse().join("").slice(0, 32);
+  return Math.abs(hash).toString(16).padStart(8, "0") + ":" + secondary;
+}
+
+// Pre-hashed default passwords (admin123 and lider123 hashed)
 const DEFAULT_USERS = [
-  { id: "admin", username: "admin", name: "Administrador", email: "admin@empresa.com", role: "admin", password: "admin123", active: true, createdAt: "2026-01-01" },
-  { id: "lider1", username: "lider", name: "Líder Técnico", email: "lider@empresa.com", role: "lider", password: "lider123", active: true, createdAt: "2026-01-01" }
+  { id: "admin", username: "admin", name: "Administrador", email: "admin@empresa.com", role: "admin", passwordHash: hashPasswordSync("admin123"), active: true, createdAt: "2026-01-01", failedAttempts: 0, lockedUntil: null },
+  { id: "lider1", username: "lider", name: "Líder Técnico", email: "lider@empresa.com", role: "lider", passwordHash: hashPasswordSync("lider123"), active: true, createdAt: "2026-01-01", failedAttempts: 0, lockedUntil: null }
 ];
+
+// ═══ SECURITY: Account Lockout after failed attempts ═══
+// OWASP A07 mitigation
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+// ═══ SECURITY: Session Timeout ═══
+// OWASP A07 mitigation
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity
 
 // [AD-INTEGRATION] Replace this function with:
 // async function authenticate(username, password) {
@@ -538,8 +596,39 @@ const DEFAULT_USERS = [
 //   return response.json(); // { success, user, token }
 // }
 function authenticateLocal(users, username, password) {
-  let user = users.find(function(u) { return (u.username === username || u.email === username) && u.password === password && u.active; });
+  const hashedInput = hashPasswordSync(password);
+  const user = users.find(function(u) {
+    return (u.username === username || u.email === username) &&
+           u.passwordHash === hashedInput &&
+           u.active &&
+           (!u.lockedUntil || new Date(u.lockedUntil) < new Date());
+  });
   return user || null;
+}
+
+function isAccountLocked(users, username) {
+  const user = users.find(function(u) { return u.username === username || u.email === username; });
+  if (!user) return false;
+  if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+    return true;
+  }
+  return false;
+}
+
+function registerFailedAttempt(users, username) {
+  return users.map(function(u) {
+    if (u.username !== username && u.email !== username) return u;
+    const attempts = (u.failedAttempts || 0) + 1;
+    const locked = attempts >= MAX_LOGIN_ATTEMPTS ? new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString() : null;
+    return Object.assign({}, u, { failedAttempts: attempts, lockedUntil: locked });
+  });
+}
+
+function resetFailedAttempts(users, username) {
+  return users.map(function(u) {
+    if (u.username !== username && u.email !== username) return u;
+    return Object.assign({}, u, { failedAttempts: 0, lockedUntil: null });
+  });
 }
 
 function LoginScreen(props) {
@@ -578,8 +667,48 @@ function LoginScreen(props) {
     //   });
     // });
 
+    // ═══ SECURITY: Check account lockout BEFORE attempting auth ═══
+    const usersCheck = loadUsers();
+    const allUsersCheck = (usersCheck?.length > 0) ? usersCheck : DEFAULT_USERS;
+    if (isAccountLocked(allUsersCheck, user)) {
+      setErr("Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta en 15 minutos.");
+      setLoading(false);
+      return;
+    }
+
     // [AD-INTEGRATION] Replace with API call
-    let users=loadUsers();let allUsers=users&&users.length>0?users:DEFAULT_USERS;let found=authenticateLocal(allUsers,user,pw);if(found){const session = {userId:found.id,username:found.username,name:found.name,email:found.email,role:found.role,loginAt:new Date().toISOString()};saveSession(session);onLogin(session)}else{setErr("Usuario o contraseña incorrectos");setLoading(false)}
+    const users = loadUsers();
+    const allUsers = (users?.length > 0) ? users : DEFAULT_USERS;
+    const found = authenticateLocal(allUsers, user, pw);
+
+    if (found) {
+      // Reset failed attempts on success
+      const updatedUsers = resetFailedAttempts(allUsers, user);
+      saveUsers(updatedUsers);
+      const session = {
+        userId: found.id,
+        username: found.username,
+        name: found.name,
+        email: found.email,
+        role: found.role,
+        loginAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString()
+      };
+      saveSession(session);
+      onLogin(session);
+    } else {
+      // Register failed attempt
+      const updatedUsers = registerFailedAttempt(allUsers, user);
+      saveUsers(updatedUsers);
+      const userAfter = updatedUsers.find(function(u) { return u.username === user || u.email === user; });
+      if (userAfter?.lockedUntil) {
+        setErr("Cuenta bloqueada por 15 minutos debido a múltiples intentos fallidos");
+      } else {
+        const remaining = MAX_LOGIN_ATTEMPTS - (userAfter?.failedAttempts || 0);
+        setErr("Usuario o contraseña incorrectos" + (remaining > 0 && remaining < 3 ? " (" + remaining + " intentos restantes)" : ""));
+      }
+      setLoading(false);
+    }
   }
 
   function onKeyDown(e) { if (e.key === "Enter") doLogin(); }
@@ -670,12 +799,51 @@ function MainApp(props){
   const _apm = useState(null),permUser=_apm[0],setPermUser=_apm[1];
   const _logs = useState([]),logs=_logs[0],setLogs=_logs[1];
   const _logFilter = useState("all"),logFilter=_logFilter[0],setLogFilter=_logFilter[1];
+  const _archive = useState([]),archive=_archive[0],setArchive=_archive[1];
 
   useEffect(function(){(function(){let d=loadD();setProjects(d&&d.length>0?d:[makeDemo()]);setReady(true)})()},[]);
   useEffect(function(){if(ready&&projects)saveD(projects)},[projects,ready]);
   useEffect(function(){let u=loadUsers();setUsers(u&&u.length>0?u:DEFAULT_USERS)},[]);
   useEffect(function(){if(users)saveUsers(users)},[users]);
   useEffect(function(){(function(){let l=loadLogs();if(l)setLogs(l)})()},[]);
+  useEffect(function(){(function(){let a=loadArchive();if(a)setArchive(a)})()},[]);
+
+  // ═══ SECURITY: Session timeout tracking ═══
+  // OWASP A07: Auto-logout after 30 minutes of inactivity
+  useEffect(function() {
+    if (!session) return;
+
+    function updateActivity() {
+      const currentSession = loadSession();
+      if (currentSession) {
+        currentSession.lastActivity = new Date().toISOString();
+        saveSession(currentSession);
+      }
+    }
+
+    function checkTimeout() {
+      const currentSession = loadSession();
+      if (!currentSession?.lastActivity) return;
+      const lastActivityTime = new Date(currentSession.lastActivity).getTime();
+      const elapsed = Date.now() - lastActivityTime;
+      if (elapsed > SESSION_TIMEOUT_MS) {
+        alert("Sesión expirada por inactividad. Por favor inicia sesión nuevamente.");
+        onLogout();
+      }
+    }
+
+    // Update activity on user interaction
+    const events = ["click", "keypress", "scroll", "mousemove"];
+    events.forEach(function(ev) { document.addEventListener(ev, updateActivity); });
+
+    // Check timeout every minute
+    const interval = setInterval(checkTimeout, 60000);
+
+    return function() {
+      events.forEach(function(ev) { document.removeEventListener(ev, updateActivity); });
+      clearInterval(interval);
+    };
+  }, [session, onLogout]);
 
   function log(type,detail,projectName){addLog(logs,setLogs,session,type,detail,projectName)}
 
@@ -704,6 +872,56 @@ function MainApp(props){
   function up(fn){setProjects(function(ps){return ps.map(function(p){return p.id===pid?fn(p):p})})}
   function addProject(){if(!pn||!prsp)return;const np = {id:uid(),name:pn,publishDate:pdt,responsible:prsp,createdAt:today(),controls:makeBaseData(),evidences:[]};setProjects(function(ps){return ps.concat([np])});setPid(np.id);setView("dashboard");setModal(null);log("PROJECT_CREATE","Proyecto creado: "+pn);sPn("");sPd(today());sPr("")}
   function delProject(id){let p=projects.find(function(x){return x.id===id});log("PROJECT_DELETE","Proyecto eliminado: "+(p?p.name:id));setProjects(function(ps){return ps.filter(function(p){return p.id!==id})});if(pid===id){setPid(null);setView("projects")}}
+
+  // ═══ FINALIZE PROJECT: Move to archive with completion date ═══
+  function finalizeProject(projectId){
+    const p = projects.find(function(x){return x.id===projectId});
+    if(!p)return;
+
+    // Validate all controls are completed
+    const incomplete = p.controls.filter(function(c){return !c.compliance||!c.compliance.trim()}).length;
+    const pending = p.evidences.filter(function(e){return e.status==="en_revision"}).length;
+
+    if(incomplete > 0){
+      alert("No se puede finalizar: hay "+incomplete+" controles sin cumplimiento documentado");
+      return;
+    }
+    if(pending > 0){
+      if(!confirm("Hay "+pending+" evidencias pendientes de revisión. ¿Finalizar de todas formas?"))return;
+    }
+
+    if(!confirm("¿Finalizar la matriz '"+p.name+"'?\n\nSe archivará como registro histórico y no podrá editarse más.\nLos controles y evidencias quedarán congelados.")) return;
+
+    // Create archive record
+    const archiveRecord = Object.assign({}, p, {
+      archivedAt: new Date().toISOString(),
+      finalizedBy: session?.name || session?.username || "Sistema",
+      finalizedByRole: session?.role || "unknown",
+      finalizedByEmail: session?.email || "",
+      stats: {
+        totalControls: p.controls.length,
+        controlsCompleted: p.controls.filter(function(c){return c.compliance&&c.compliance.trim()}).length,
+        totalEvidences: p.evidences.length,
+        evidencesApproved: p.evidences.filter(function(e){return e.status==="aprobada"}).length,
+        evidencesRejected: p.evidences.filter(function(e){return e.status==="rechazada"}).length,
+        evidencesPending: pending
+      }
+    });
+
+    // Save to archive
+    const newArchive = (archive||[]).concat([archiveRecord]);
+    setArchive(newArchive);
+    saveArchive(newArchive);
+
+    // Remove from active projects
+    setProjects(function(ps){return ps.filter(function(x){return x.id!==projectId})});
+
+    log("PROJECT_FINALIZE","Matriz finalizada y archivada: "+p.name, p.name);
+
+    // Navigate back
+    if(pid===projectId){setPid(null);setView("projects")}
+    alert("✅ Matriz finalizada y archivada correctamente.\n\nPuedes consultarla en el historial (📚 Archivo).");
+  }
   function setComp(id,val){let ctrl=proj?proj.controls.find(function(c){return c.id===id}):null;if(val&&val.trim()&&ctrl&&(!ctrl.compliance||!ctrl.compliance.trim())){log("CONTROL_FILL","Cumplimiento documentado: "+(ctrl?ctrl.code:"")+" - "+(ctrl?ctrl.causaBase:""),proj?proj.name:"")}if(!val||!val.trim()){if(ctrl&&ctrl.compliance&&ctrl.compliance.trim()){log("CONTROL_CLEAR","Cumplimiento borrado: "+(ctrl?ctrl.code:""),proj?proj.name:"")}}up(function(p){return Object.assign({},p,{controls:p.controls.map(function(c){return c.id===id?Object.assign({},c,{compliance:val}):c})})})}
   function addEv(d){let ctrl=proj?proj.controls.find(function(c){return c.id===d.controlId}):null;log("EVIDENCE_ADD","Evidencia agregada: "+d.description+" → "+(ctrl?ctrl.code:""),proj?proj.name:"");up(function(p){return Object.assign({},p,{evidences:p.evidences.concat([Object.assign({},d,{id:uid(),status:"en_revision",createdAt:today()})])})})}
   function setEvSt(id,st){let ev=proj?proj.evidences.find(function(e){return e.id===id}):null;let ctrl=ev&&proj?proj.controls.find(function(c){return c.id===ev.controlId}):null;log(st==="aprobada"?"EVIDENCE_APPROVE":"EVIDENCE_REJECT","Evidencia "+(st==="aprobada"?"aprobada":"rechazada")+": "+(ev?ev.description:"")+" → "+(ctrl?ctrl.code:""),proj?proj.name:"");up(function(p){return Object.assign({},p,{evidences:p.evidences.map(function(e){return e.id===id?Object.assign({},e,{status:st,reviewer:session.name||"Revisor"}):e})})})}
@@ -719,6 +937,10 @@ function MainApp(props){
     try{
       const s2 = document.createElement("script");
       s2.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      // OWASP A08: Subresource Integrity to prevent CDN tampering
+      s2.integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL6KxamzBp31jYA==";
+      s2.crossOrigin="anonymous";
+      s2.referrerPolicy="no-referrer";
       if(!document.querySelector('script[src*="jszip"]'))document.head.appendChild(s2);
       setTimeout(function(){
         if(typeof JSZip==="undefined"){alert("Cargando librerías, intenta de nuevo en 2 segundos.");return}
@@ -908,6 +1130,7 @@ function MainApp(props){
           )
         ),
         h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+          h("button",{style:btnS("outline","sm"),onClick:function(){setView("archive");log("ARCHIVE_VIEW","Historial consultado")}},"📚 Archivo"),
           session.role==="admin"?h("button",{style:btnS("outline","sm"),onClick:function(){setView("logs")}},"📋 Logs"):null,
           session.role==="admin"?h("button",{style:btnS("outline","sm"),onClick:function(){setView("admin")}},"⚙️ Usuarios"):null,
           h("button",{style:btnS("ghost","sm"),onClick:doLogout},"Cerrar sesión →")
@@ -1156,6 +1379,25 @@ function MainApp(props){
         )
       ),
 
+      // ── Finalize button (only admin/lider, requires all controls completed) ──
+      (session.role==="admin"||session.role==="lider")?h("div",{style:Object.assign({},cS,{marginBottom:20,padding:20,border:"2px solid "+(wc===tc&&tc>0?T.sc:T.bd)+"55",background:wc===tc&&tc>0?T.ss:T.sa})},
+        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}},
+          h("div",null,
+            h("h3",{style:{margin:0,fontSize:16,fontWeight:800,color:T.tx}},"🏁 Finalizar Matriz"),
+            h("p",{style:{margin:"4px 0 0",fontSize:12,color:T.ts}},
+              wc===tc&&tc>0?
+                "Todos los controles están documentados. Puedes archivar esta matriz como registro histórico.":
+                "Faltan "+(tc-wc)+" controles por completar antes de poder finalizar."
+            )
+          ),
+          h("button",{
+            disabled:wc!==tc||tc===0,
+            style:Object.assign({},btnS(wc===tc&&tc>0?"success":"outline"),{padding:"12px 24px",opacity:wc===tc&&tc>0?1:0.5,cursor:wc===tc&&tc>0?"pointer":"not-allowed"}),
+            onClick:function(){finalizeProject(proj.id)}
+          },"🏁 Finalizar y Archivar")
+        )
+      ):null,
+
       // ── Detail per control ──
       h("div",{style:cS},
         h("div",{style:{fontSize:15,fontWeight:800,marginBottom:14}},"Detalle por Control"),
@@ -1354,6 +1596,100 @@ function MainApp(props){
     );
   }
 
+  // ═══ ARCHIVE VIEWER ═══
+  if(view==="archive"){
+    const sortedArchive = (archive||[]).slice().sort(function(a,b){return new Date(b.archivedAt) - new Date(a.archivedAt)});
+    const visibleArchive = session.role==="admin" ? sortedArchive : sortedArchive.filter(function(a){
+      // Non-admin users only see archived projects they had access to
+      const currentUser = (users||[]).find(function(u){return u.id===session.userId||u.username===session.username});
+      if(!currentUser)return false;
+      return currentUser.projectPerms?.[a.id];
+    });
+
+    content=h("div",null,
+      h("button",{style:btnS("ghost","sm"),onClick:function(){setView("projects")}},"← Proyectos"),
+      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"12px 0 20px",flexWrap:"wrap",gap:10}},
+        h("div",null,
+          h("h2",{style:{margin:0,fontSize:24,fontWeight:900}},"📚 Archivo de Matrices Finalizadas"),
+          h("p",{style:{margin:"4px 0 0",fontSize:13,color:T.ts}},visibleArchive.length+" matrices en el historial")
+        )
+      ),
+
+      // Stats
+      visibleArchive.length > 0 ? h("div",{style:{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}},
+        [
+          {l:"Total matrices",v:visibleArchive.length,c:T.ac},
+          {l:"Controles documentados",v:visibleArchive.reduce(function(s,a){return s+(a.stats?.controlsCompleted||0)},0),c:"#2E8B57"},
+          {l:"Evidencias aprobadas",v:visibleArchive.reduce(function(s,a){return s+(a.stats?.evidencesApproved||0)},0),c:"#1A7AB5"}
+        ].map(function(s){
+          return h("div",{key:s.l,style:{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:T.sa,borderRadius:8,border:"1px solid "+T.bd}},
+            h("span",{style:Object.assign({},mS,{fontSize:14,fontWeight:800,color:s.c})},s.v),
+            h("span",{style:{fontSize:11,color:T.td}},s.l)
+          );
+        })
+      ) : null,
+
+      visibleArchive.length === 0 ? h("div",{style:Object.assign({},cS,{textAlign:"center",padding:60})},
+        h("div",{style:{fontSize:48,marginBottom:12}},"📚"),
+        h("h3",{style:{margin:"0 0 8px",fontSize:18,color:T.tx}},"Sin matrices archivadas"),
+        h("p",{style:{margin:0,fontSize:13,color:T.ts}},"Las matrices que finalices aparecerán aquí como registro histórico")
+      ) : h("div",{style:{display:"flex",flexDirection:"column",gap:12}},
+        visibleArchive.map(function(a){
+          const archivedDate = new Date(a.archivedAt);
+          const stats = a.stats || {};
+          return h("div",{key:a.id,style:Object.assign({},cS,{padding:20,borderLeft:"4px solid "+T.sc})},
+            h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,gap:12,flexWrap:"wrap"}},
+              h("div",{style:{flex:1,minWidth:200}},
+                h("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}},
+                  h("h3",{style:{margin:0,fontSize:16,fontWeight:800}},a.name),
+                  h("span",{style:bdg(T.sc,T.ss)},"✓ Finalizada")
+                ),
+                h("div",{style:{fontSize:12,color:T.ts,marginBottom:2}},"Responsable: "+(a.responsible||"—")),
+                h("div",{style:{fontSize:12,color:T.ts,marginBottom:2}},"Fecha de publicación: "+(a.publishDate||"—")),
+                h("div",{style:{fontSize:12,color:T.sc,fontWeight:600}},"🏁 Finalizada: "+archivedDate.toLocaleDateString("es-CO")+" "+archivedDate.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})),
+                h("div",{style:{fontSize:12,color:T.ts}},"Por: "+(a.finalizedBy||"—")+" ("+(a.finalizedByRole||"")+")")
+              ),
+              h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+                h("button",{style:btnS("outline","sm"),onClick:function(){
+                  log("ARCHIVE_EXPORT","Exportación desde archivo: "+a.name, a.name);
+                  exportProject(a);
+                }},"📥 Exportar"),
+                session.role==="admin"?h("button",{style:btnS("ghost","sm"),onClick:function(){
+                  if(confirm("¿Eliminar este registro del archivo?\n\nEsto no afecta el archivo Excel ya descargado pero sí elimina el registro histórico en la app.")){
+                    const newArchive = archive.filter(function(x){return x.id!==a.id});
+                    setArchive(newArchive);
+                    saveArchive(newArchive);
+                    log("PROJECT_DELETE","Registro archivado eliminado: "+a.name);
+                  }
+                }},"🗑 Eliminar"):null
+              )
+            ),
+            // Stats badges
+            h("div",{style:{display:"flex",gap:8,flexWrap:"wrap",paddingTop:10,borderTop:"1px solid "+T.bd}},
+              h("div",{style:{padding:"4px 10px",background:T.sa,borderRadius:6,fontSize:11}},
+                h("span",{style:{color:T.td}},"Controles: "),
+                h("span",{style:{color:T.tx,fontWeight:700}},(stats.controlsCompleted||0)+"/"+(stats.totalControls||0))
+              ),
+              h("div",{style:{padding:"4px 10px",background:T.sa,borderRadius:6,fontSize:11}},
+                h("span",{style:{color:T.td}},"Evidencias: "),
+                h("span",{style:{color:T.tx,fontWeight:700}},stats.totalEvidences||0)
+              ),
+              stats.evidencesApproved > 0 ? h("div",{style:{padding:"4px 10px",background:T.ss,borderRadius:6,fontSize:11}},
+                h("span",{style:{color:T.sc,fontWeight:700}},"✓ "+stats.evidencesApproved+" aprobadas")
+              ) : null,
+              stats.evidencesRejected > 0 ? h("div",{style:{padding:"4px 10px",background:"#FEE2E2",borderRadius:6,fontSize:11}},
+                h("span",{style:{color:"#DC2626",fontWeight:700}},"✕ "+stats.evidencesRejected+" rechazadas")
+              ) : null,
+              stats.evidencesPending > 0 ? h("div",{style:{padding:"4px 10px",background:T.ws,borderRadius:6,fontSize:11}},
+                h("span",{style:{color:T.wn,fontWeight:700}},"⏳ "+stats.evidencesPending+" pendientes")
+              ) : null
+            )
+          );
+        })
+      )
+    );
+  }
+
   // ═══ ADMIN - USER MANAGEMENT ═══
   if(view==="admin"&&session.role==="admin"){
 
@@ -1361,8 +1697,11 @@ function MainApp(props){
 
     function createUser(){
       if(!newUser||!newName||!newPw)return;
+      // Basic password policy (OWASP A07)
+      if(newPw.length < 8){alert("La contraseña debe tener al menos 8 caracteres");return}
       if(users.some(function(u){return u.username===newUser})){alert("El usuario ya existe");return}
-      const nu = {id:uid(),username:newUser,name:newName,email:newEmail,role:newRole,password:newPw,active:true,createdAt:today(),projectPerms:{}};
+      // Hash password before storing (OWASP A02)
+      const nu = {id:uid(),username:newUser,name:newName,email:newEmail,role:newRole,passwordHash:hashPasswordSync(newPw),active:true,createdAt:today(),projectPerms:{},failedAttempts:0,lockedUntil:null};
       setUsers(function(prev){return prev.concat([nu])});
       log("USER_CREATE","Usuario creado: "+newName+" (@"+newUser+") - Rol: "+newRole);
       setNewUser("");setNewName("");setNewEmail("");setNewRole("lider");setNewPw("");setAdminModal(null);
