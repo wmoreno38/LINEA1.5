@@ -198,11 +198,12 @@ function btnS(v,sz){const base = {borderRadius:10,border:"none",cursor:"pointer"
 function bdg(c,b){return{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 12px",borderRadius:20,fontSize:11,fontWeight:700,color:c,background:b,whiteSpace:"nowrap"}}
 
 function NormBox(props){
-  const n = props.norm;if(!n)return null;
+  const _open = useState(false),open=_open[0],setOpen=_open[1];
+  const n = props.norm;
+  if(!n)return null;
   const secs = [{k:"iso27001",l:"ISO 27001",c:"#5B21B6",b:"rgba(91,33,182,.08)"},{k:"iso27002",l:"ISO 27002",c:"#1A7AB5",b:"rgba(26,122,181,.08)"},{k:"circular",l:"Circular SFC",c:"#B45309",b:"rgba(180,83,9,.08)"},{k:"sfc",l:"Req. Nube SFC",c:"#166534",b:"rgba(22,101,52,.08)"},{k:"otras",l:"Otras Normas",c:"#B91C1C",b:"rgba(185,28,28,.08)"}];
   let has=secs.filter(function(s){return n[s.k]&&n[s.k].trim()&&n[s.k].indexOf("Validar aplicación directamente")<0&&n[s.k]!=="Aplica"});
   if(!has.length)return null;
-  const _open = useState(false),open=_open[0],setOpen=_open[1];
   return h("div",{style:{marginTop:12}},
     h("button",{onClick:function(){setOpen(!open)},style:{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",background:T.sa,border:"1px solid "+T.bd,borderRadius:8,cursor:"pointer",color:T.ts,fontSize:12,fontWeight:700,fontFamily:FONT_FAMILY,textTransform:"uppercase",letterSpacing:"0.5px"}},
       h("span",{style:{transition:"transform .2s",transform:open?"rotate(90deg)":"rotate(0deg)",fontSize:10}},"▶"),
@@ -223,14 +224,21 @@ function EvBdg(p){let s=EV_ST[p.status];if(!s)return null;return h("span",{style
 function Questionnaire(props){
   const proj = props.proj,onSave=props.onSave,onFinish=props.onFinish;
   const _idx = useState(0),idx=_idx[0],setIdx=_idx[1];
-  let items=proj.controls;
-  let total=items.length;
+  const items = proj.controls;
+  const total = items.length;
+  const safeIdx = total > 0 ? Math.min(idx, total - 1) : 0;
+  const cur = total > 0 ? items[safeIdx] : null;
+  const _lv = useState(cur?.compliance || ""),lv=_lv[0],setLv=_lv[1];
+  useEffect(function(){
+    if(total > 0){
+      setLv(items[Math.min(idx, total - 1)].compliance || "");
+    }
+  },[idx, total]);
+
+  // Early return AFTER all hooks
   if(total===0)return h("div",{style:{textAlign:"center",padding:60}},h("div",{style:{fontSize:48}},"📭"),h("p",{style:{color:T.ts}},"No hay controles"));
-  let safeIdx=Math.min(idx,total-1);
-  let cur=items[safeIdx];
-  let filled=items.filter(function(x){return x.compliance&&x.compliance.trim()}).length;
-  const _lv = useState(cur.compliance||""),lv=_lv[0],setLv=_lv[1];
-  useEffect(function(){setLv(items[Math.min(idx,total-1)].compliance||"")},[idx]);
+
+  const filled = items.filter(function(x){return x.compliance&&x.compliance.trim()}).length;
   function saveGo(ni){onSave(cur.id,lv);setIdx(ni)}
 
   return h("div",{style:{maxWidth:900,margin:"0 auto",padding:"0 0 30px"}},
