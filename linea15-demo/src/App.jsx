@@ -56,7 +56,7 @@ function makeDemo(){
 }
 
 function loadD(){try{let v=localStorage.getItem("rg-v8");return v?JSON.parse(v):null}catch(e){return null}}
-function saveD(d){try{localStorage.setItem("rg-v8",JSON.stringify(d))}catch(e){console.warn("storage error",e)}}
+function saveD(d){try{localStorage.setItem("rg-v8",JSON.stringify(d))}catch(e){/* Non-critical: storage write failure ignored */}}
 
 // ═══ AUDIT & TRANSACTION LOG SYSTEM ═══
 const LOG_TYPES={
@@ -81,7 +81,7 @@ const LOG_TYPES={
 };
 
 function loadLogs(){try{let v=localStorage.getItem("l15-logs");return v?JSON.parse(v):null}catch(e){return null}}
-function saveLogs(d){try{localStorage.setItem("l15-logs",JSON.stringify(d))}catch(e){console.warn("storage error",e)}}
+function saveLogs(d){try{localStorage.setItem("l15-logs",JSON.stringify(d))}catch(e){/* Non-critical: storage write failure ignored */}}
 
 function addLog(logs,setLogs,session,type,detail,projectName){
   const entry = {id:uid(),timestamp:new Date().toISOString(),type:type,category:(LOG_TYPES[type]||{}).cat||"Sistema",user:session?session.name||session.username:"Sistema",userId:session?session.userId:"system",detail:detail,project:projectName||"",ip:"browser"};
@@ -128,7 +128,7 @@ function addLog(logs,setLogs,session,type,detail,projectName){
   // }
 
   let updated=(logs||[]).concat([entry]);
-  if(updated.length>1000)updated=updated.slice(updated.length-1000);
+  if(updated.length>1000)updated=updated.slice(-1000);
   setLogs(updated);
   saveLogs(updated);
   return entry;
@@ -461,9 +461,9 @@ const AUTH_ROLES = {
 };
 
 function loadUsers(){try{let v=localStorage.getItem("l15-users");return v?JSON.parse(v):null}catch(e){return null}}
-function saveUsers(d){try{localStorage.setItem("l15-users",JSON.stringify(d))}catch(e){console.warn("storage error",e)}}
+function saveUsers(d){try{localStorage.setItem("l15-users",JSON.stringify(d))}catch(e){/* Non-critical: storage write failure ignored */}}
 function loadSession(){try{let v=localStorage.getItem("l15-session");return v?JSON.parse(v):null}catch(e){return null}}
-function saveSession(d){try{if(d){localStorage.setItem("l15-session",JSON.stringify(d))}else{localStorage.removeItem("l15-session")}}catch(e){console.warn("storage error",e)}}
+function saveSession(d){try{if(d){localStorage.setItem("l15-session",JSON.stringify(d))}else{localStorage.removeItem("l15-session")}}catch(e){/* Non-critical: storage write failure ignored */}}
 
 const DEFAULT_USERS = [
   { id: "admin", username: "admin", name: "Administrador", email: "admin@empresa.com", role: "admin", password: "admin123", active: true, createdAt: "2026-01-01" },
@@ -799,7 +799,7 @@ function MainApp(props){
           ctrlFolder.file("Ev"+(ei+1)+"_info.txt",meta);
           if(ev.files&&ev.files.length>0){
             ev.files.forEach(function(f){
-              try{let b64=f.data.split(",")[1];if(b64)ctrlFolder.file(f.name||"archivo",b64,{base64:true})}catch(err){console.warn("file error",err)}
+              try{let b64=f.data.split(",")[1];if(b64)ctrlFolder.file(f.name||"archivo",b64,{base64:true})}catch(err){/* Non-critical: file read failure ignored */}
             });
           }
         });
@@ -1466,7 +1466,7 @@ function MainApp(props){
   if(modal==="add-project"){
     projModal=h(Mdl,{title:"Nuevo Proyecto",onClose:function(){setModal(null)}},
       h(Fld,{label:"Nombre del proyecto"},h("input",{style:iS,value:pn,onChange:function(e){sPn(e.target.value)},placeholder:"Ej: Migración Cloud"})),
-      h(Fld,{label:"Fecha de publicación"},h("input",{type:"date",style:Object.assign({},iS,{colorScheme:"light"}),value:pdt||today(),onChange:function(e){sPd(e.target.value)},onClick:function(e){try{e.target.showPicker()}catch(err){console.warn("file error",err)}}})),
+      h(Fld,{label:"Fecha de publicación"},h("input",{type:"date",style:Object.assign({},iS,{colorScheme:"light"}),value:pdt||today(),onChange:function(e){sPd(e.target.value)},onClick:function(e){try{e.target.showPicker()}catch(err){/* Non-critical: file read failure ignored */}}})),
       h(Fld,{label:"Responsable"},h("input",{style:iS,value:prsp,onChange:function(e){sPr(e.target.value)},placeholder:"Ej: Líder Técnico del Proyecto"})),
       h("div",{style:{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}},h("button",{style:btnS("outline"),onClick:function(){setModal(null)}},"Cancelar"),h("button",{style:btnS("primary"),disabled:!pn||!prsp,onClick:addProject},"Crear Proyecto"))
     );
