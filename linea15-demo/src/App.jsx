@@ -489,6 +489,33 @@ function LoginScreen(props) {
   function doLogin() {
     if (!user || !pw) { setErr("Ingresa usuario y contraseña"); return; }
     setLoading(true); setErr("");
+
+    // [RECAPTCHA-INTEGRATION] Agregar reCAPTCHA v3 antes de autenticar
+    // Prerequisitos:
+    //   1. Agregar en index.html: <script src="https://www.google.com/recaptcha/api.js?render=YOUR_SITE_KEY"></script>
+    //   2. Obtener site key y secret key en https://www.google.com/recaptcha/admin
+    //   3. Crear endpoint backend para validar el token
+    //
+    // grecaptcha.ready(function() {
+    //   grecaptcha.execute('YOUR_SITE_KEY', {action: 'login'}).then(function(token) {
+    //     // Validar token en backend antes de autenticar
+    //     fetch('/api/auth/recaptcha', {
+    //       method: 'POST',
+    //       headers: {'Content-Type':'application/json'},
+    //       body: JSON.stringify({token: token, action: 'login'})
+    //     }).then(function(r){ return r.json() }).then(function(result) {
+    //       if(result.success && result.score >= 0.5) {
+    //         // Score OK - proceder con autenticación
+    //         doAuthenticate();
+    //       } else {
+    //         setErr("Verificación de seguridad fallida. Intenta de nuevo.");
+    //         setLoading(false);
+    //       }
+    //     });
+    //   });
+    // });
+
+    // [AD-INTEGRATION] Replace with API call
     var users=loadUsers();var allUsers=users&&users.length>0?users:DEFAULT_USERS;var found=authenticateLocal(allUsers,user,pw);if(found){var session={userId:found.id,username:found.username,name:found.name,email:found.email,role:found.role,loginAt:new Date().toISOString()};saveSession(session);onLogin(session)}else{setErr("Usuario o contraseña incorrectos");setLoading(false)}
   }
 
@@ -544,8 +571,8 @@ export default function AppWrapper() {
     (function(){var s=loadSession();if(s&&s.userId){setSession(s)}setAuthReady(true)})();
   }, []);
 
-  function handleLogin(s) { setSession(s); addLog([],setLogs,s,"LOGIN","Inicio de sesión: "+s.name+" ("+s.role+")",""); }
-  function handleLogout() { log("LOGOUT","Cierre de sesión"); setSession(null); saveSession(null); }
+  function handleLogin(s) { setSession(s); }
+  function handleLogout() { setSession(null); saveSession(null); }
 
   if (!authReady) return h("div", { style: { fontFamily: "'DM Sans',sans-serif", background: T.bg, color: T.tx, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" } }, "Cargando...");
   if (!session) return h(LoginScreen, { onLogin: handleLogin });
@@ -588,6 +615,27 @@ function MainApp(props){
   useEffect(function(){(function(){var l=loadLogs();if(l)setLogs(l)})()},[]);
 
   function log(type,detail,projectName){addLog(logs,setLogs,session,type,detail,projectName)}
+
+  // ═══ PERMISSION HELPERS ═══
+  // Returns user's permission for a project: "full","fill","evidence","view","none"
+  function getUserPerm(projectId){
+    if(!session)return "none";
+    if(session.role==="admin")return "full"; // Admin always has full access
+    var currentUser=(users||[]).find(function(u){return u.id===session.userId||u.username===session.username});
+    if(!currentUser)return "none";
+    if(!currentUser.projectPerms)return "none";
+    return currentUser.projectPerms[projectId]||"none";
+  }
+  function canView(projectId){var p=getUserPerm(projectId);return p!=="none"}
+  function canFill(projectId){var p=getUserPerm(projectId);return p==="full"||p==="fill"}
+  function canEvidence(projectId){var p=getUserPerm(projectId);return p==="full"||p==="evidence"}
+  function canApprove(){return session&&(session.role==="admin"||session.role==="lider"||session.role==="auditor")}
+
+  // Log login on first mount
+  useEffect(function(){if(session&&session.name){log("LOGIN","Inicio de sesión: "+session.name+" ("+session.role+")")}},[]);
+
+  // Wrap logout to log before clearing session
+  var doLogout=function(){log("LOGOUT","Cierre de sesión: "+session.name);setTimeout(function(){onLogout()},100)};
 
   var proj=useMemo(function(){return projects?projects.find(function(p){return p.id===pid})||null:null},[projects,pid]);
   function up(fn){setProjects(function(ps){return ps.map(function(p){return p.id===pid?fn(p):p})})}
@@ -775,6 +823,8 @@ function MainApp(props){
   if(view==="projects"){
 
     var filteredProjects=projects.filter(function(p){
+      // Permission check: non-admin users only see assigned projects
+      if(session.role!=="admin"&&!canView(p.id))return false;
       if(projSearch&&(p.name+" "+p.responsible+" "+p.publishDate).toLowerCase().indexOf(projSearch.toLowerCase())<0)return false;
       if(projFilter==="complete"){var wc2=p.controls.filter(function(x){return x.compliance&&x.compliance.trim()}).length;return p.controls.length>0&&wc2===p.controls.length}
       if(projFilter==="pending"){var wc3=p.controls.filter(function(x){return x.compliance&&x.compliance.trim()}).length;return p.controls.length===0||wc3<p.controls.length}
@@ -797,7 +847,7 @@ function MainApp(props){
         h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
           session.role==="admin"?h("button",{style:btnS("outline","sm"),onClick:function(){setView("logs")}},"📋 Logs"):null,
           session.role==="admin"?h("button",{style:btnS("outline","sm"),onClick:function(){setView("admin")}},"⚙️ Usuarios"):null,
-          h("button",{style:btnS("ghost","sm"),onClick:onLogout},"Cerrar sesión →")
+          h("button",{style:btnS("ghost","sm"),onClick:doLogout},"Cerrar sesión →")
         )
       ),
       // Header
@@ -1023,20 +1073,20 @@ function MainApp(props){
         )
       ),
 
-      // ── Action buttons ──
-      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:20}},
-        h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+T.wn+"55"}),onClick:function(){setView("wizard")}},
+      // ── Action buttons (permission-aware) ──
+      h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}},
+        canFill(proj.id)?h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+T.wn+"55"}),onClick:function(){setView("wizard")}},
           h("div",{style:{fontSize:32,marginBottom:6}},"📝"),h("h3",{style:{margin:0,fontSize:14,fontWeight:800,color:T.wn}},"Llenar Controles"),
           h("div",{style:{marginTop:8}},h("span",{style:bdg(T.wn,T.ws)},(tc-wc)+" pendientes"))
-        ),
-        h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+T.sc+"55"}),onClick:function(){setView("add-ev")}},
+        ):null,
+        canEvidence(proj.id)?h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+T.sc+"55"}),onClick:function(){setView("add-ev")}},
           h("div",{style:{fontSize:32,marginBottom:6}},"📎"),h("h3",{style:{margin:0,fontSize:14,fontWeight:800,color:T.sc}},"Agregar Evidencias"),
           h("div",{style:{marginTop:8}},h("span",{style:bdg(T.sc,T.ss)},te+" registradas"))
-        ),
-        h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+(eReview>0?T.wn:T.ac)+"55"}),onClick:function(){setView("evidences")}},
+        ):null,
+        canApprove()?h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+(eReview>0?T.wn:T.ac)+"55"}),onClick:function(){setView("evidences")}},
           h("div",{style:{fontSize:32,marginBottom:6}},"✅"),h("h3",{style:{margin:0,fontSize:14,fontWeight:800,color:eReview>0?T.wn:T.ac}},"Aprobar Evidencias"),
           h("div",{style:{marginTop:8}},eReview>0?h("span",{style:bdg(T.wn,T.ws)},eReview+" por revisar"):h("span",{style:bdg(T.sc,T.ss)},"Todo al día"))
-        ),
+        ):null,
         h("div",{style:Object.assign({},cS,{cursor:"pointer",textAlign:"center",padding:"24px 16px",border:"2px solid "+T.inf+"55"}),onClick:function(){exportProject(proj)}},
           h("div",{style:{fontSize:32,marginBottom:6}},"📥"),h("h3",{style:{margin:0,fontSize:14,fontWeight:800,color:T.inf}},"Exportar Matriz"),
           h("div",{style:{marginTop:8}},h("span",{style:bdg(T.inf,T.inf+"18")},"Excel + Evidencias"))
