@@ -524,92 +524,159 @@ function MainApp(props){
   function exportProject(project){
     if(!project)return;
     try{
-      var s1=document.createElement("script");
-      s1.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
       var s2=document.createElement("script");
       s2.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-      if(!document.querySelector('script[src*="xlsx"]'))document.head.appendChild(s1);
       if(!document.querySelector('script[src*="jszip"]'))document.head.appendChild(s2);
       setTimeout(function(){
-        if(typeof XLSX==="undefined"||typeof JSZip==="undefined"){alert("Cargando librerías, intenta de nuevo en 2 segundos.");return}
+        if(typeof JSZip==="undefined"){alert("Cargando librerías, intenta de nuevo en 2 segundos.");return}
         doExport(project);
-      },typeof XLSX!=="undefined"?100:2500);
+      },typeof JSZip!=="undefined"?100:2500);
     }catch(e){alert("Error: "+e.message)}
   }
 
   function doExport(project){
-    var zip=new JSZip();
+    var mainZip=new JSZip();
 
-    // ── OPEN ORIGINAL TEMPLATE ──
+    // ── MODIFY EXCEL BY EDITING XML INSIDE THE XLSX ZIP ──
     var templateBytes=Uint8Array.from(atob(MATRIX_TEMPLATE),function(c){return c.charCodeAt(0)});
-    var wb=XLSX.read(templateBytes,{type:"array"});
-    var ws=wb.Sheets[wb.SheetNames[0]];
 
-    // ── FILL COLUMN U (col 20 = "T" 0-indexed from A) and V (col 21) ──
-    // Row 0 = header, data starts at row 1
-    project.controls.forEach(function(ctrl,idx){
-      var row=idx+1; // Excel row (0-indexed in sheet, row 0 = header)
-      var cellU=XLSX.utils.encode_cell({r:row,c:20}); // Column U = Descripción del Cumplimiento
-      var cellV=XLSX.utils.encode_cell({r:row,c:21}); // Column V = Evidencia
+    JSZip.loadAsync(templateBytes).then(function(xlsxZip){
+      // Read the sheet XML
+      return xlsxZip.file("xl/worksheets/sheet1.xml").async("string").then(function(sheetXml){
+        // Read shared strings
+        return xlsxZip.file("xl/sharedStrings.xml").async("string").then(function(ssXml){
+          // Parse shared strings to get count
+          var ssMatch=ssXml.match(/count="(\d+)"/);
+          var ssUniqueMatch=ssXml.match(/uniqueCount="(\d+)"/);
+          var currentCount=ssMatch?parseInt(ssMatch[1]):0;
+          var currentUnique=ssUniqueMatch?parseInt(ssUniqueMatch[1]):0;
 
-      // Write compliance
-      if(ctrl.compliance&&ctrl.compliance.trim()){
-        ws[cellU]={t:"s",v:ctrl.compliance};
-      }
+          // Collect new strings to add
+          var newStrings=[];
+          var cellUpdates=[]; // {row, col, stringIndex}
 
-      // Write evidence file names
-      var evs=project.evidences.filter(function(e){return e.controlId===ctrl.id});
-      if(evs.length>0){
-        var evList=evs.map(function(ev,ei){
-          var fileNames=ev.files&&ev.files.length>0?ev.files.map(function(f){return f.name}).join(", "):"";
-          return "Ev"+(ei+1)+": "+ev.description+(fileNames?" ["+fileNames+"]":"");
-        }).join("\n");
-        ws[cellV]={t:"s",v:evList};
-      }
-    });
+          project.controls.forEach(function(ctrl,idx){
+            var excelRow=idx+2; // Row 1=header, Row 2=CT-001, etc.
 
-    // Update sheet range to include new data
-    var range=XLSX.utils.decode_range(ws["!ref"]||"A1");
-    if(range.e.c<21)range.e.c=21;
-    ws["!ref"]=XLSX.utils.encode_range(range);
+            // Column U = compliance
+            if(ctrl.compliance&&ctrl.compliance.trim()){
+              var sIdx=currentUnique+newStrings.length;
+              newStrings.push(ctrl.compliance);
+              cellUpdates.push({row:excelRow,col:"U",sIdx:sIdx});
+            }
 
-    // Write modified Excel
-    var xlsxData=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-    zip.file("MATRIZ_"+project.name.replace(/[^a-zA-Z0-9]/g,"_")+".xlsx",xlsxData);
-
-    // ── ADD EVIDENCE FILES ──
-    var evidenceFolder=zip.folder("Evidencias");
-
-    project.controls.forEach(function(ctrl){
-      var evs=project.evidences.filter(function(e){return e.controlId===ctrl.id});
-      if(evs.length===0)return;
-
-      var folderName=ctrl.code+"_"+ctrl.causaBase.replace(/[^a-zA-Z0-9 ]/g,"").substring(0,40).trim();
-      var ctrlFolder=evidenceFolder.folder(folderName);
-
-      evs.forEach(function(ev,ei){
-        var meta="Control: "+ctrl.code+" - "+ctrl.causaBase+"\n";
-        meta+="Evidencia: "+ev.description+"\n";
-        meta+="Tipo: "+ev.type+"\n";
-        meta+="Fecha: "+ev.date+"\n";
-        meta+="Estado: "+ev.status+"\n";
-        if(ev.reviewer)meta+="Revisor: "+ev.reviewer+"\n";
-        if(ev.notes)meta+="Notas: "+ev.notes+"\n";
-        ctrlFolder.file("Ev"+(ei+1)+"_info.txt",meta);
-
-        if(ev.files&&ev.files.length>0){
-          ev.files.forEach(function(f){
-            try{
-              var b64=f.data.split(",")[1];
-              if(b64)ctrlFolder.file(f.name||"archivo",b64,{base64:true});
-            }catch(err){}
+            // Column V = evidence list
+            var evs=project.evidences.filter(function(e){return e.controlId===ctrl.id});
+            if(evs.length>0){
+              var evText=evs.map(function(ev,ei){
+                var fNames=ev.files&&ev.files.length>0?ev.files.map(function(f){return f.name}).join(", "):"";
+                return "Ev"+(ei+1)+": "+ev.description+(fNames?" ["+fNames+"]":"");
+              }).join("\n");
+              var sIdx2=currentUnique+newStrings.length;
+              newStrings.push(evText);
+              cellUpdates.push({row:excelRow,col:"V",sIdx:sIdx2});
+            }
           });
-        }
-      });
-    });
 
-    // ── DOWNLOAD ──
-    zip.generateAsync({type:"blob"}).then(function(content){
+          // ── UPDATE SHARED STRINGS XML ──
+          if(newStrings.length>0){
+            var newCount=currentCount+newStrings.length;
+            var newUnique=currentUnique+newStrings.length;
+            ssXml=ssXml.replace(/count="\d+"/, 'count="'+newCount+'"');
+            ssXml=ssXml.replace(/uniqueCount="\d+"/, 'uniqueCount="'+newUnique+'"');
+
+            // Add new <si> elements before closing </sst>
+            var newSiEntries=newStrings.map(function(str){
+              var escaped=str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+              return '<si><t xml:space="preserve">'+escaped+'</t></si>';
+            }).join("");
+            ssXml=ssXml.replace("</sst>",newSiEntries+"</sst>");
+          }
+
+          // ── UPDATE SHEET XML - insert values into cells ──
+          cellUpdates.forEach(function(upd){
+            var cellRef=upd.col+upd.row;
+            var replaced=false;
+
+            // Try self-closing first: <c r="U2" s="26"/>
+            var pat1='<c r="'+cellRef+'"';
+            if(sheetXml.indexOf(pat1)>=0){
+              // Find the full tag
+              var idx=sheetXml.indexOf(pat1);
+              var endSelf=sheetXml.indexOf("/>",idx);
+              var endFull=sheetXml.indexOf("</c>",idx);
+
+              if(endSelf>=0&&(endFull<0||endSelf<endFull)){
+                // Self-closing tag
+                var oldTag=sheetXml.substring(idx,endSelf+2);
+                var styleMatch=oldTag.match(/s="(\d+)"/);
+                var style=styleMatch?' s="'+styleMatch[1]+'"':'';
+                var newTag='<c r="'+cellRef+'"'+style+' t="s"><v>'+upd.sIdx+'</v></c>';
+                sheetXml=sheetXml.substring(0,idx)+newTag+sheetXml.substring(endSelf+2);
+                replaced=true;
+              }else if(endFull>=0){
+                // Full tag with content
+                var oldTag2=sheetXml.substring(idx,endFull+4);
+                var styleMatch2=oldTag2.match(/s="(\d+)"/);
+                var style2=styleMatch2?' s="'+styleMatch2[1]+'"':'';
+                var newTag2='<c r="'+cellRef+'"'+style2+' t="s"><v>'+upd.sIdx+'</v></c>';
+                sheetXml=sheetXml.substring(0,idx)+newTag2+sheetXml.substring(endFull+4);
+                replaced=true;
+              }
+            }
+
+            if(!replaced){
+              // Cell doesn't exist - add to row
+              var rowStart='<row r="'+upd.row+'"';
+              var ri=sheetXml.indexOf(rowStart);
+              if(ri>=0){
+                var rowTagEnd=sheetXml.indexOf(">",ri);
+                if(rowTagEnd>=0){
+                  var insertPos=rowTagEnd+1;
+                  sheetXml=sheetXml.substring(0,insertPos)+'<c r="'+cellRef+'" t="s"><v>'+upd.sIdx+'</v></c>'+sheetXml.substring(insertPos);
+                }
+              }
+            }
+          });
+
+          // ── REBUILD THE XLSX ──
+          xlsxZip.file("xl/worksheets/sheet1.xml",sheetXml);
+          xlsxZip.file("xl/sharedStrings.xml",ssXml);
+
+          return xlsxZip.generateAsync({type:"arraybuffer"});
+        });
+      });
+    }).then(function(modifiedXlsx){
+      // Add modified Excel to main ZIP
+      mainZip.file("MATRIZ_"+project.name.replace(/[^a-zA-Z0-9]/g,"_")+".xlsx",modifiedXlsx);
+
+      // ── ADD EVIDENCE FILES ──
+      var evidenceFolder=mainZip.folder("Evidencias");
+      project.controls.forEach(function(ctrl){
+        var evs=project.evidences.filter(function(e){return e.controlId===ctrl.id});
+        if(evs.length===0)return;
+        var folderName=ctrl.code+"_"+ctrl.causaBase.replace(/[^a-zA-Z0-9 ]/g,"").substring(0,40).trim();
+        var ctrlFolder=evidenceFolder.folder(folderName);
+        evs.forEach(function(ev,ei){
+          var meta="Control: "+ctrl.code+" - "+ctrl.causaBase+"\n";
+          meta+="Evidencia: "+ev.description+"\n";
+          meta+="Tipo: "+ev.type+"\n";
+          meta+="Fecha: "+ev.date+"\n";
+          meta+="Estado: "+ev.status+"\n";
+          if(ev.reviewer)meta+="Revisor: "+ev.reviewer+"\n";
+          if(ev.notes)meta+="Notas: "+ev.notes+"\n";
+          ctrlFolder.file("Ev"+(ei+1)+"_info.txt",meta);
+          if(ev.files&&ev.files.length>0){
+            ev.files.forEach(function(f){
+              try{var b64=f.data.split(",")[1];if(b64)ctrlFolder.file(f.name||"archivo",b64,{base64:true})}catch(err){}
+            });
+          }
+        });
+      });
+
+      // ── DOWNLOAD ──
+      return mainZip.generateAsync({type:"blob"});
+    }).then(function(content){
       var a=document.createElement("a");
       a.href=URL.createObjectURL(content);
       a.download=project.name.replace(/[^a-zA-Z0-9]/g,"_")+"_Export.zip";
