@@ -1,5 +1,6 @@
 import React from "react";
 import { MATRIX_TEMPLATE } from "./template.js";
+import JSZip from "jszip";
 // Common constants (extracted for maintainability)
 const FONT_FAMILY = "'DM Sans',sans-serif";
 const MONO_FONT = "'Space Mono',monospace";
@@ -943,17 +944,7 @@ function MainApp(props){
     if(!project)return;
     log("EXPORT","Exportación de matriz: "+project.name,project.name);
     try{
-      const s2 = document.createElement("script");
-      s2.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-      // OWASP A08: Subresource Integrity to prevent CDN tampering
-      s2.integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL6KxamzBp31jYA==";
-      s2.crossOrigin="anonymous";
-      s2.referrerPolicy="no-referrer";
-      if(!document.querySelector('script[src*="jszip"]'))document.head.appendChild(s2);
-      setTimeout(function(){
-        if(typeof JSZip==="undefined"){alert("Cargando librerías, intenta de nuevo en 2 segundos.");return}
-        doExport(project);
-      },typeof JSZip!=="undefined"?100:2500);
+      doExport(project);
     }catch(e){alert("Error: "+e.message)}
   }
 
